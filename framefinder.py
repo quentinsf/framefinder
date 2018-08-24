@@ -1,4 +1,8 @@
 #! /usr/bin/env python3
+#
+# (c) Quentin Stafford-Fraser 
+# quentinsf.com
+
 
 import glob
 import itertools
@@ -13,17 +17,35 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 
 class FFWindow(QtWidgets.QWidget):
 
-    def __init__(self, video_files):
+    def __init__(self, movie_dir, pos_snapshot_dir, neg_snapshot_dir):
         super().__init__()
 
-        self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
+        self.media_player = QMediaPlayer( None, QMediaPlayer.VideoSurface)
 
-        self.video_files = video_files
+        self.movie_dir = movie_dir
+        video_list = glob.glob(os.path.join(self.movie_dir, "*.mp4"))
+        print("{} movies found".format(len(video_list)))
+        # We want to be able to cycle through them
+        self.video_files = itertools.cycle(iter(video_list))
+        
+        # Check the output directories exist
+        self.pos_snapshot_dir = pos_snapshot_dir
+        if not os.path.exists(self.pos_snapshot_dir):
+            os.makedirs(self.pos_snapshot_dir)
+        self.neg_snapshot_dir = neg_snapshot_dir
+        if not os.path.exists(self.neg_snapshot_dir):
+            os.makedirs(self.neg_snapshot_dir)
 
         self.setWindowTitle('FrameFinder')
         
         self.video_widget = QVideoWidget()
+        # self.video_widget.setFixedSize(640, 360)
+        # self.video_widget.
         self.video_widget.setMinimumSize(640, 360)
+        self.video_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding)
+        self.media_player.setVideoOutput(self.video_widget)
+
         
         self.position_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.position_slider.setRange(0, 0)
@@ -72,20 +94,20 @@ class FFWindow(QtWidgets.QWidget):
         self.fast_forward_but.setText("Fast [H]")
         self.fast_forward_but.clicked.connect(self.fast_forward)
 
-        self.snapshot_but = QtWidgets.QPushButton()
-        self.snapshot_but.setText("Snapshot [P]")
-        self.snapshot_but.clicked.connect(self.take_snapshot)
+        self.pos_snapshot_but = QtWidgets.QPushButton()
+        self.pos_snapshot_but.setText("Snapshot Positive [P]")
+        self.pos_snapshot_but.clicked.connect(self.pos_snapshot)
 
-        self.mark_but = QtWidgets.QPushButton()
-        self.mark_but.setText("Mark")
-        self.mark_but.clicked.connect(self.mark)
+        self.neg_snapshot_but = QtWidgets.QPushButton()
+        self.neg_snapshot_but.setText("Snapshot Negative [O]")
+        self.neg_snapshot_but.clicked.connect(self.neg_snapshot)
 
         self.next_but = QtWidgets.QPushButton()
-        self.next_but.setText("Next")
+        self.next_but.setText("Next movie")
         self.next_but.clicked.connect(self.next_video)
 
         video_vbox = QtWidgets.QVBoxLayout()
-        video_vbox.addWidget(self.video_widget, 100)
+        video_vbox.addWidget(self.video_widget)
         video_vbox.addWidget(self.position_slider)
         control_box = QtWidgets.QHBoxLayout()
         control_box.addWidget(self.rewind_but)
@@ -100,27 +122,28 @@ class FFWindow(QtWidgets.QWidget):
         video_vbox.addWidget(self.fileLabel)
 
         file_box = QtWidgets.QHBoxLayout()
-        file_box.addWidget(self.snapshot_but)
-        file_box.addWidget(self.mark_but)
+        file_box.addWidget(self.pos_snapshot_but)
+        file_box.addWidget(self.neg_snapshot_but)
         file_box.addWidget(self.next_but)
 
         v_box = QtWidgets.QVBoxLayout()
-        v_box.addStretch()
+        # v_box.addStretch()
         v_box.addLayout(video_vbox)
 
         v_box.addLayout(file_box)
-        v_box.addStretch()
+        # v_box.addStretch()
 
         self.setLayout(v_box)
 
-        self.media_player.setVideoOutput(self.video_widget)
         self.media_player.stateChanged.connect(self.status_changed)
         # self.media_player.availabilityChanged.connect(self.status_changed)
         self.media_player.positionChanged.connect(self.position_changed)
         self.media_player.durationChanged.connect(self.duration_changed)
         self.media_player.error.connect(self.handleError)
 
+
         self.next_video()
+
 
         # Set up some keyboard shortcuts
 
@@ -133,6 +156,9 @@ class FFWindow(QtWidgets.QWidget):
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("d"), self)
         shortcut.activated.connect(self.play_but.animateClick)
 
+        shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(" "), self)
+        shortcut.activated.connect(self.play_but.animateClick)
+
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("f"), self)
         shortcut.activated.connect(self.slow_forward_but.animateClick)
 
@@ -143,7 +169,10 @@ class FFWindow(QtWidgets.QWidget):
         shortcut.activated.connect(self.fast_forward_but.animateClick)
 
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("p"), self)
-        shortcut.activated.connect(self.snapshot_but.animateClick)
+        shortcut.activated.connect(self.pos_snapshot_but.animateClick)
+
+        shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("o"), self)
+        shortcut.activated.connect(self.neg_snapshot_but.animateClick)
 
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("n"), self)
         shortcut.activated.connect(self.next_but.animateClick)
@@ -157,37 +186,41 @@ class FFWindow(QtWidgets.QWidget):
             self.play()
 
     def pause(self):
-        print("Pausing")
         self.media_player.pause()
 
     def play(self):
-        print("Playing")
         self.media_player.play()
+        # This is a nasty hack.  The video tends to zoom to 1:1
+        # when you play, but rescales itself when you resize the window.
+        # Faking a window resize is the only way I could find to fix the zoom.
+        size = self.size()
+        self.resize(size.width()+1, size.height()+1)
+        self.resize(size.width(), size.height())
 
 
     def rewind(self):
         self.media_player.setPlaybackRate(-1)
-        print("<")
+        self.errorLabel.setText("Rewind 1x")
         self.play()
 
     def slow_rewind(self):
         self.media_player.setPlaybackRate(-0.25)
-        print("<S")
+        self.errorLabel.setText("Rewind 0.25x")
         self.play()
 
     def slow_forward(self):
         self.media_player.setPlaybackRate(0.25)
-        print("S>")
+        self.errorLabel.setText("Forward 0.25x")
         self.play()
 
     def forward(self):
         self.media_player.setPlaybackRate(1.0)
-        print(">")
+        self.errorLabel.setText("Forward 1x")
         self.play()
 
     def fast_forward(self):
         self.media_player.setPlaybackRate(2.0)
-        print(">>")
+        self.errorLabel.setText("Forward 2x")
         self.play()
 
 
@@ -212,16 +245,23 @@ class FFWindow(QtWidgets.QWidget):
     def set_position(self, position):
         self.media_player.setPosition(position)
 
-    def take_snapshot(self):
-        video_file = self.media.canonicalUrl().path()
+    def pos_snapshot(self):
+        self.snapshot(self.pos_snapshot_dir)
+
+    def neg_snapshot(self):
+        self.snapshot(self.neg_snapshot_dir)
+
+    def snapshot(self, snap_dir):
+        video_path = self.media.canonicalUrl().path()
         position = self.media_player.position()
+        video_file, extension = os.path.splitext(os.path.basename(video_path))
+        snapshot_file = os.path.join(snap_dir, "{}_{}.jpg".format(video_file, position))
         # Use ffmpeg because it's not clear how to get 
         # the frame back from the video surface
-        snapshot_file = "{}_{}.jpg".format(video_file, position)
         cmd = [
             "ffmpeg",
             "-ss", str(position/1000),
-            "-i", video_file,
+            "-i", video_path,
             "-frames", "1",
             snapshot_file
         ]
@@ -231,9 +271,6 @@ class FFWindow(QtWidgets.QWidget):
             self.errorLabel.setText("Saved {}".format(snapshot_file))
         else:
             self.errorLabel.setText("Error running ffmpeg")
-
-    def mark(self):
-        print("Should mark location")
 
     def next_video(self):
         # Display the next file if there is one
@@ -258,9 +295,11 @@ class FFWindow(QtWidgets.QWidget):
 
 
 def main():
+    if len(sys.argv) < 4:
+        print("{} MOVIE_DIR POS_SNAPSHOT_DIR NEG_SNAPSHOT_DIR".format(sys.argv[0]), file=sys.stderr)
+        sys.exit(1)
     app = QtWidgets.QApplication(sys.argv)
-    videos = itertools.cycle(iter(glob.glob("movies/*.mp4")))
-    w = FFWindow(videos)
+    w = FFWindow(sys.argv[1], sys.argv[2], sys.argv[3])
     w.show()
     sys.exit(app.exec_())
 
