@@ -103,7 +103,7 @@ class FFWindow(QtWidgets.QWidget):
         self.neg_snapshot_but.clicked.connect(self.neg_snapshot)
 
         self.next_but = QtWidgets.QPushButton()
-        self.next_but.setText("Next movie")
+        self.next_but.setText("Next movie [N]")
         self.next_but.clicked.connect(self.next_video)
 
         video_vbox = QtWidgets.QVBoxLayout()

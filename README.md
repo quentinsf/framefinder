@@ -10,9 +10,11 @@ You give it a directory full of MP4 files and the names of two output directorie
 
 It will display the first movie, and allow you to play it forward or backwards at different speeds and pause when you get to a representative frame.  Then you can press a key to store the snapshot JPEG either in the positive or negative directory.  Repeat as required until you have enough sample images.
 
-The snapshots are named with the video file followed by the timestamp in milliseconds, e.g. from approx 43 secs into mymovie.mp4, you might get mymovie_43256.jpg.
+The snapshots are named with the video file followed by the timestamp in milliseconds, e.g. from approx 43 secs into `mymovie.mp4`, you might get `mymovie_43256.jpg`.
 
 Pressing the Next Movie button will move onto the next MP4 file.
+
+Most of the buttons have keyboard shortcuts displayed on them.
 
 
 [Quentin Stafford-Fraser](http://quentinsf.com)
