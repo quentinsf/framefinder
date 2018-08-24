@@ -3,3 +3,6 @@ venv
 .env
 .venv
 .vscode
+movies
+pos_snapshots
+neg_snapshots
